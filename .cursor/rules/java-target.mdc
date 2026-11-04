@@ -1,0 +1,41 @@
+---
+description: Spring Boot conventions for modern/ — constructor injection, BigDecimal, layering, Flyway names, and soft delete.
+globs: modern/**
+alwaysApply: false
+---
+
+# Java target
+
+Package root is `com.atu.modern`. Java 21, Spring Boot 3, Spring Data JDBC, Flyway, H2. `ATU_SRC/` stays read-only.
+
+## Injection
+
+Constructor injection only. Do not put `@Autowired` on a field.
+
+`modern/src/main/java/com/atu/modern/HealthController.java:11` is the constructor Spring calls. The class has no field injection.
+
+## Money and quantity
+
+Money and quantities are `BigDecimal`. Never `double` or `float`. Set the scale from the DDS and pass `RoundingMode` on every divide or half-adjust.
+
+`ATU_SRC/QDDSSRC/SAMREF.PF:50` is `TOTPRICE 9P 2`. `ATU_SRC/QRPGLESRC/VAT300.RPGLE:47` half-adjusts with `%dech(tot : 9 : 2)`, which is `setScale(2, RoundingMode.HALF_UP)`. A plain assignment in RPG truncates; do not use `HALF_UP` for that.
+
+Scale-0 keys (`CUID`, `ORID`, `YEAR`, `ODLINE`) stay `Integer`.
+
+## Layers
+
+No business logic in a controller. HTTP in `*Controller`, rules in `*Service`, database access in `*Repository`.
+
+`HealthController.health` only returns the status map (`modern/src/main/java/com/atu/modern/HealthController.java:14-16`). A VAT or stock calculation does not belong there. There is no service or repository yet; add them when the first rule moves.
+
+## Flyway
+
+One table per file: `modern/src/main/resources/db/migration/V<n>__<table>.sql`. Column names match the DDS names (`ARID`, not `ar_id`).
+
+Flyway is on and reads `classpath:db/migration` (`modern/src/main/resources/application.yml:12-14`). `V1__baseline.sql:1` is only a comment. The next script is the first real table, for example `V2__ARTICLE.sql`, using the names from `ATU_SRC/QDDSSRC/SAMREF.PF`.
+
+## Soft delete
+
+Keep the delete column and set it to `X`. Do not hard-delete the row.
+
+`ATU_SRC/QDDSSRC/SAMREF.PF:27` says `DELETE CODE X=DELETED`. `ATU_SRC/QRPGLESRC/ART300.RPGLE:99` treats a found article as live only when `ardel <> 'X'`.
