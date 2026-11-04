@@ -1,0 +1,27 @@
+---
+description: Characterisation tests for migrated rules — JUnit 5 parameterized CSV vectors and a DisplayName that cites the legacy line.
+globs: modern/src/test/**
+alwaysApply: false
+---
+
+# Tests
+
+Migrated rules are pinned by characterisation tests. The test describes what the legacy program does, including behavior that looks wrong. Do not "fix" it in the test.
+
+## Shape
+
+Use JUnit 5 `@ParameterizedTest` with `@CsvFileSource`. Golden vectors live in `src/test/resources/golden/<rule>.csv`, one rule per file. No golden file exists yet; add the CSV with the test, do not inline the rows.
+
+`modern/src/test/java/com/atu/modern/ModernApplicationTests.java:6-10` only loads the context. It is not a pattern for a numeric rule.
+
+## Name
+
+Every characterisation test has `@DisplayName` citing the legacy `file:line`.
+
+`@DisplayName("VAT300.RPGLE:47 rounds HALF_UP")` matches `ATU_SRC/QRPGLESRC/VAT300.RPGLE:47`, which returns `%dech(tot : 9 : 2)`.
+
+## What the test records
+
+Record the legacy result, not the result you wish the program produced.
+
+`ATU_SRC/QRPGLESRC/ART200.PGM.SQLRPGLE:112` reads `article2`, then `:118` sets `sflend = %eof(article1)`. A characterisation test asserts that split. It does not retarget `sflend` at `article2`.
