@@ -1,0 +1,62 @@
+---
+description: How to read atuMerlin RPG and DDS — decimals, half-adjust, file ops, soft delete, numeric dates, triggers, and fixed-form indicators.
+globs: ATU_SRC/**
+alwaysApply: false
+---
+
+# Reading the legacy source
+
+Resolve every field through `REF` / `REFFLD` back to `ATU_SRC/QDDSSRC/SAMREF.PF` before naming a Java type. Quote the line. Do not infer a type from the name.
+
+## Decimals
+
+Packed `nP d` and zoned `nS d` are `BigDecimal` with precision `n` and scale `d`. DDS writes zoned with no type letter: `n  d`.
+
+- Packed money: `TOTPRICE 9P 2` at `ATU_SRC/QDDSSRC/SAMREF.PF:50`.
+- Zoned percent: `VATRATE 4  2` at `ATU_SRC/QDDSSRC/SAMREF.PF:61`.
+- Zoned quantity: `QUANTITY 5  0` at `ATU_SRC/QDDSSRC/SAMREF.PF:47`.
+
+Scale-0 keys stay `Integer`: `CUID 5P 0` at `ATU_SRC/QDDSSRC/SAMREF.PF:15`, and the same for `ORID`, `YEAR`, and `ODLINE`.
+
+## Rounding
+
+`%dech` and `eval(h)` (the `H` extender) half-adjust: `RoundingMode.HALF_UP`. Plain `eval` and `%dec` truncate toward zero. Do not invent half-adjust when the source has neither.
+
+`ATU_SRC/QRPGLESRC/VAT300.RPGLE:47` returns `%dech(tot : 9 : 2)` after `tot = (net * vatrate) / 100` (`:46`). `tot` is zoned `11  4` (`:43`). This tree has no `eval(h)`.
+
+## File operations
+
+`CHAIN` is a lookup by key. `SETLL` plus `READE` is a range read. `%found` and `%eof` are the result checks; do not replace them with a Java exception.
+
+- `chain id order1` at `ATU_SRC/QRPGLESRC/ORD202.PGM.RPGLE:83`.
+- `setll id detord1` / `reade id detord1` / `dow not %eof(detord1)` at `ATU_SRC/QRPGLESRC/ORD202.PGM.RPGLE:103-105`.
+- `return %found(VATDEF) and VATDEL <> 'X'` at `ATU_SRC/QRPGLESRC/VAT300.RPGLE:57`.
+
+## Soft delete
+
+`DLCODE` value `X` means soft-deleted. `ATU_SRC/QDDSSRC/SAMREF.PF:26-27` is `DLCODE 1` with text `DELETE CODE X=DELETED`. Readers must exclude those rows, as `ATU_SRC/QRPGLESRC/ART300.RPGLE:99` does: `%found(article1) and ardel <> 'X'`.
+
+## Dates
+
+An `8  0` number is `yyyyMMdd`, not a date type. `ORDATE 8  0` is `ATU_SRC/QDDSSRC/ORDER.PF:9`. `ATU_SRC/QRPGLESRC/ORD202.PGM.RPGLE:85` converts it with `%date(ordate:*iso)`. The same program converts `ordatdel` only when `ordatdel > 0` (`:86-87`). Zero means no date.
+
+## Logic outside the program
+
+Business logic also lives in triggers (`QTRGSRC`), SQL procedures and SQL triggers (`QSQLSRC`), and data areas (`QDTASRC`). Read them before moving a rule.
+
+- `ATU_SRC/QTRGSRC/ORD700A.SYSTRG:4-7` fires `ORD700` after insert on `DETORD`.
+- `ATU_SRC/QSQLSRC/ART801.SQLPRC:6` is procedure `UPDATE_ON_CUS_ORD_QTY`.
+- `ATU_SRC/QRPGLESRC/ORD100.PGM.RPGLE:56` binds `Ordno` to data area `LASTORDNO`, then `in *lock` / `out` at `:189-191`.
+
+## Fixed form
+
+Fixed-form column positions and `*INxx` indicators are part of the operation. Do not guess what an indicator means. Quote the line and the line that tests it.
+
+`ATU_SRC/QRPGSRC/COU200.RPG:40-41`:
+
+```
+     C                     READ COUNTRY             N    80
+     C           *IN80     DOWEQ*OFF
+```
+
+`ATU_SRC/QRPGSRC/COU200.RPG:111` is `CHAINCOUNTRY` with result indicator `98`. Nothing in `S02PRP` tests `*IN98`. Leave it that way.
