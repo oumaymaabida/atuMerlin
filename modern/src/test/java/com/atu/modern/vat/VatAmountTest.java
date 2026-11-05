@@ -49,6 +49,15 @@ class VatAmountTest {
 	}
 
 	@Test
+	@DisplayName("VAT300.RPGLE:68-72 a later update of the same code is visible on the next amount")
+	void sameCodeReadsTheCurrentRate() {
+		loadRate("1", "19.65", " ");
+		assertThat(this.vatService.amount("1", new BigDecimal("10.00"))).isEqualByComparingTo("1.97");
+		this.jdbc.update("UPDATE VATDEF SET VATRATE = ? WHERE VATCODE = ?", new BigDecimal("10.00"), "1");
+		assertThat(this.vatService.amount("1", new BigDecimal("10.00"))).isEqualByComparingTo("1.00");
+	}
+
+	@Test
 	@DisplayName("VAT300.RPGLE:46-47 ClcVAT half-adjusts and still charges VATDEL X")
 	void amountOverHttp() throws Exception {
 		loadRate("1", "19.65", " ");
